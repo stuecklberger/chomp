@@ -37,6 +37,22 @@ pub enum Constraint {
     Not(Box<Constraint>)
 }
 
+fn print_indented(i: u32, s: &str) {
+    let mut pad = String::new();
+    for _ in 0..i {
+        pad.push_str("  ");
+    }
+    println!("{}{}", pad, s);
+}
+
+// fn parser_print(i: Input<u8>, s: &str) {
+//     println!("{}", s);
+//     parse!{i;
+//         peek_next();
+//         ret Constraint::Id("any".to_string())
+//     }
+// }
+
 fn is_horizontal_space(c: u8) -> bool { c == b' ' || c == b'\t' }
 fn is_space(c: u8)            -> bool { c == b' ' }
 fn is_not_space(c: u8)        -> bool { c != b' ' }
@@ -52,50 +68,57 @@ fn end_of_line(i: Input<u8>) -> U8Result<u8> {
           |i| token(i, b'\n'))
 }
 
-fn identifier(i: Input<u8>) -> U8Result<Constraint> {
+fn identifier(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "identifier");
     parse!{i;
                 take_while(is_space);
         let n = take_while1(is_identifier_char);
+        // parser_print("hithere");
 
         ret Constraint::Id("identifier".to_string())
     }
 }
 
-fn parentheses(i: Input<u8>) -> U8Result<Constraint> {
+fn parentheses(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "parentheses");
     parse!{i;
                 take_while(is_space);
                 token(b'(');
-        let c = constraint();
+        let c = constraint(indent+1);
+                take_while(is_space);
                 token(b')');
 
         ret c
     }
 }
 
-fn not(i: Input<u8>) -> U8Result<Constraint> {
+fn not(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "not");
     parse!{i;
                 take_while(is_space);
                 token(b'!');
-        let c = constraint();
+        let c = constraint(indent+1);
 
         ret Constraint::Not(Box::new(c))
     }
 }
 
-fn unary(i: Input<u8>) -> U8Result<Constraint> {
+fn unary(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "unary");
     parse!{i;
-                not()
-                <|> parentheses()
-                <|> identifier()
+                not(indent+1)
+                <|> parentheses(indent+1)
+                <|> identifier(indent+1)
     }
 }
 
-fn conjunction(i: Input<u8>) -> U8Result<Constraint> {
+fn conjunction(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "conjunction");
     parse!{i;
-        let first = unary();
+        let first = unary(indent+1);
                     take_while(is_space);
                     token(b'.');
-        let other = conjunction();
+        let other = conjunction(indent+1);
 
         ret Constraint::Or(
             Box::new(first),
@@ -104,19 +127,21 @@ fn conjunction(i: Input<u8>) -> U8Result<Constraint> {
     }
 }
 
-fn conjunction_or_unary(i: Input<u8>) -> U8Result<Constraint> {
+fn conjunction_or_unary(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "conjunction_or_unary");
     parse!{i;
-        conjunction()
-        <|> unary()
+        conjunction(indent+1)
+        <|> unary(indent+1)
     }
 }
 
-fn disjunction(i: Input<u8>) -> U8Result<Constraint> {
+fn disjunction(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "disjunction");
     parse!{i;
-        let first = conjunction_or_unary();
+        let first = conjunction_or_unary(indent+1);
                     take_while(is_space);
                     token(b'|');
-        let other = disjunction();
+        let other = disjunction(indent+1);
 
         ret Constraint::Or(
             Box::new(first),
@@ -125,17 +150,19 @@ fn disjunction(i: Input<u8>) -> U8Result<Constraint> {
     }
 }
 
-fn binary(i: Input<u8>) -> U8Result<Constraint> {
+fn binary(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "binary");
     parse!{i;
-        disjunction()
-        <|> conjunction()
+        disjunction(indent+1)
+        <|> conjunction(indent+1)
     }
 }
 
-fn constraint(i: Input<u8>) -> U8Result<Constraint> {
+fn constraint(i: Input<u8>, indent: u32) -> U8Result<Constraint> {
+    print_indented(indent, "constraint");
     parse!{i;
-        binary()
-        <|> unary()
+        binary(indent+1)
+        <|> unary(indent+1)
     }
 }
 
@@ -152,7 +179,7 @@ fn rule(i: Input<u8>) -> U8Result<Rule> {
         let src = take_while1(is_identifier_char);
                   take_while(is_space);
                   token(b':');
-        let c   = constraint();
+        let c   = constraint(0);
                   take_while(is_space);
                   token(b':');
                   take_while(is_space);
